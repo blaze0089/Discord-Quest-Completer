@@ -38,7 +38,7 @@ body:
     attributes:
       label: Vencord or BetterDiscord installed?
       options:
-        - "None"
+        - "No mods installed"
         - "Vencord"
         - "BetterDiscord"
         - "Both"
