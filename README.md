@@ -19,7 +19,7 @@
 
 <br />
 
-**A advanced tool for Discord Quest completion**
+**A behavioral simulation engine for Discord Quest completion**
 
 Relay employs statistical timing models and human activity patterns to complete Discord Quests through Discord's internal APIs. Single-paste execution. No external dependencies.
 
