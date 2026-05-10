@@ -6,7 +6,7 @@
 
 # Relay
 
-### Advanced Discord Quest Automation Framework
+### Advanced Discord Quest Completer
 
 <sub>Developed by <a href="https://github.com/blaze0089"><strong>BLAZE-X</strong></a> &nbsp;·&nbsp; Release <code>v1.0.0-phantom</code></sub>
 
