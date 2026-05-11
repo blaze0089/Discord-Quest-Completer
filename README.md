@@ -56,6 +56,21 @@ Relay is a client-side automation framework designed for Discord Quest completio
 
 The framework implements adaptive timing strategies based on statistical distributions to simulate natural user behavior patterns, making automated quest completion indistinguishable from manual interaction.
 
+### 🔐 A Note on Code Obfuscation
+
+You’ll notice that parts of `index.js` contain XOR‑encrypted strings and integrity checks.  
+These **are not** malicious, do **not** steal tokens, and do **not** send any data anywhere.
+
+Relay was originally a private, proprietary tool. The encryption you see is a **tamper‑protection layer**—it ensures the script only functions correctly in its original, unmodified form. Now that Relay is open source, we’ve kept that layer active to prevent unauthorized rebranding or crippled forks from circulating under the same name.
+
+If you’re ever unsure about what a particular section does, feel free to:
+
+- Read the code yourself (it’s fully client‑side, no obfuscation is hidden).
+- Ask any AI code analyzer to explain it — you’ll see it’s just a creative anti‑tamper mechanism with no hidden side effects.
+- Review the [Issue Tracker](https://github.com/blaze0089/Discord-Quest-Completer/issues) to confirm no one has reported anything suspicious.
+
+Transparency matters, especially in this space. Nothing is hidden for a malicious purpose.
+
 ### Key Capabilities
 
 - **Universal Quest Support** - Handles all five Discord Quest types: GAME, VIDEO, STREAM, ACTIVITY, and ACHIEVEMENT
