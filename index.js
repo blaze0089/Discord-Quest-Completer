@@ -3,7 +3,7 @@
 
     const CONFIG = {
         NAME: "Relay",
-        VERSION: "v1.0.0-phantom",
+        VERSION: "v1.0.1",
         CREATOR: "BLAZE-X",
         THEME: "#0a4d33",
         SUCCESS: "#10B981",
@@ -12,8 +12,6 @@
         MAX_LOG_ITEMS: 80,
     };
 
-    
-    
     const _c = CONFIG.CREATOR;
     const _sum = _c.split('').reduce((a, b) => a + b.charCodeAt(0), 0); 
 
@@ -39,28 +37,37 @@
     const _verify = () => (_c.length === 7 && _sum === 499);
     
 
-    function nameSeed(str) {
-        let h = 0;
-        for (let i = 0; i < str.length; i++) h = ((h << 5) - h) + str.charCodeAt(i);
-        return (h >>> 0) & 0x7fffffff;
-    }
-    const CREATOR_SEED = nameSeed(CONFIG.CREATOR);
     const SEED_A = (CONFIG.CREATOR.charCodeAt(0) ^ 66) | (CONFIG.CREATOR.charCodeAt(CONFIG.CREATOR.length - 1) ^ 88);
     const SEED_B = (CONFIG.CREATOR.charCodeAt(2) ^ 76) & 7;
     const SEED_C = CONFIG.CREATOR.length & 3;
     const SEED_D = (CONFIG.CREATOR.charCodeAt(4) || 66) % 5;
 
+    const _H = (_c.length === 7 && _sum === 499) ? (() => { let _h_ = 0; const _s_ = CONFIG.CREATOR + CONFIG.NAME + CONFIG.VERSION; for (let _i_ = 0; _i_ < _s_.length; _i_++) { _h_ = ((_h_ << 7) - _h_ + _s_.charCodeAt(_i_)) >>> 0; _h_ ^= (_h_ >>> 9); _h_ = (_h_ * 0x9e3779b9) >>> 0; } return _h_; })() : (_c.length > 0 ? null : 0);
+    const _T = _H !== null ? (_H >>> 8) ^ (_H << 13) ^ (_H << 21) : _c.length;
+    const _K = _H !== null ? ((_H * 0x9e3779b9) >>> 0) ^ _T : (_sum & 0xFF) + 1;
+    const _seeds = [];
+    for (let _si = 0; _si < 200; _si++) {
+        let _sv = _si;
+        const _st = String(_si) + CONFIG.CREATOR + CONFIG.NAME + CONFIG.VERSION + String(_H === null ? _si : _H);
+        for (let _sj = 0; _sj < _st.length; _sj++) {
+            _sv = ((_sv << 7) - _sv + _st.charCodeAt(_sj)) >>> 0;
+            _sv ^= (_sv >>> 9);
+            _sv = (_sv * 0x9e3779b9) >>> 0;
+        }
+        _seeds.push(_sv & 0xFFFF);
+    }
+
     function mulberry32(a) {
-        
-        let _v = _verify() ? 1 : NaN; 
+        let _v = (_c.length === 7 && _sum === 499) ? 1 : 0;
         return function() {
             a |= 0; a = a + 0x6D2B79F5 | 0;
             var t = Math.imul(a ^ a >>> 15, 1 | a);
             t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+            t = (t ^ ((_H & 0x7fffffff) || (_T & 0x7fffffff)));
             return (((t ^ t >>> 14) >>> 0) / 4294967296) * _v;
         };
     }
-    const rng = mulberry32(CREATOR_SEED);
+    const rng = mulberry32(_H >>> 1);
 
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     const rnd = (min, max) => Math.floor(rng() * (max - min + 1)) + min;
@@ -69,15 +76,15 @@
         return Math.max(0, mean + std * Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v));
     };
     const lognormalRandom = (mu, sigma) => Math.exp(gaussRandom(mu, sigma));
-    const randomPID = () => ((Date.now() >> 4) ^ Math.floor(rng() * 65535)) & 0x7FFF;
+    const randomPID = () => ((Date.now() >> 4) ^ Math.floor(rng() * 65535)) & (_H || 0) & 0x7FFF;
 
     const TIMING = {
-        video: { mu: (1.8 + rng() * 0.2) * DRIFT, sigma: 0.25 + rng() * 0.15 },
-        enroll: { mean: rnd(800, 1200) * DRIFT, std: rnd(200, 400) },
-        claim: { min: rnd(15000, 30000) * DRIFT, max: rnd(30000, 45000), extra: { prob: 0.1 + rng() * 0.1, min: rnd(60000, 120000), max: rnd(180000, 360000) } },
-        pause: { prob: 0.1 + rng() * 0.1, mean: rnd(3000, 6000), std: rnd(1500, 2500) },
-        abandon: { fails: rnd(2, 3), prob: 0.6 + rng() * 0.2 },
-        captcha: { prob: 0.2 + rng() * 0.15, delayMin: rnd(60000, 90000), delayMax: rnd(150000, 240000) }
+        video: { mu: (1.8 + rng() * 0.2) * DRIFT + (_seeds[100] % 100) * 0.001, sigma: 0.25 + rng() * 0.15 + (_seeds[101] % 50) * 0.001 },
+        enroll: { mean: rnd(800, 1200) * DRIFT + (_seeds[102] % 30), std: rnd(200, 400) + (_seeds[103] % 10) },
+        claim: { min: rnd(15000, 30000) * (DRIFT + (_K & 1) * 0.01) + (_seeds[104] % 500), max: rnd(30000, 45000) * (DRIFT + (_K >> 1 & 1) * 0.01) + (_seeds[105] % 500), extra: { prob: 0.1 + rng() * 0.1 + (_seeds[106] % 20) * 0.001, min: rnd(60000, 120000) + (_seeds[107] % 1000), max: rnd(180000, 360000) + (_seeds[108] % 2000) } },
+        pause: { prob: 0.1 + rng() * 0.1 + (_seeds[110] % 20) * 0.001, mean: rnd(3000, 6000) + (_seeds[111] % 100), std: rnd(1500, 2500) + (_seeds[112] % 50) },
+        abandon: { fails: rnd(2, 3) + (_seeds[115] & 1), prob: 0.6 + rng() * 0.2 + (_seeds[116] % 20) * 0.001 },
+        captcha: { prob: 0.2 + rng() * 0.15 + (_seeds[118] % 20) * 0.001, delayMin: (_H & 0xFF) * rnd(60000, 90000) / 0xED + (_seeds[119] % 500), delayMax: rnd(150000, 240000) + (_seeds[120] % 1000) }
     };
 
     const RUNTIME = {
@@ -158,7 +165,7 @@
                     if (!exp || typeof exp !== 'object') continue;
                     for (const k of Object.keys(exp)) {
                         const p = exp[k];
-                        if (p && typeof p.get === 'function' && typeof p.post === 'function' && typeof p.patch === 'function' && typeof p.del === 'function' && !p._dispatcher) return p;
+                        if (p && typeof p.get === 'function' && typeof p.post === 'function' && typeof p.del === 'function' && !p._dispatcher) return p;
                     }
                 }
             };
@@ -213,11 +220,27 @@
         } catch (e) { return null; }
     }
 
-    const Mods = hookModules();
-    if (!Mods) {
-        console.error(`[${CONFIG.NAME}] Failed to hook Discord modules.`);
-        return;
+    function findModsViaVencord() {
+        if (typeof Vencord === 'undefined') return null;
+        try {
+            const w = Vencord.Webpack;
+            const qStores = w.findAll(m => { try { return m?.quests instanceof Map } catch(e) { return false } });
+            const rStores = w.findAll(m => { try { return typeof m.getRunningGames === 'function' && typeof m.getGameForPID === 'function' } catch(e) { return false } });
+            const deps = w.findAll(m => { try { return m._subscriptions && typeof m.subscribe === 'function' && typeof m.dispatch === 'function' } catch(e) { return false } });
+            const api = w.Common?.RestAPI || w.findByProps('get', 'post', 'del');
+            if (!qStores.length || !deps.length) return null;
+            return {
+                QuestStore: qStores[0],
+                RunStore: rStores[0] || { getRunningGames: () => [], getGameForPID: () => null },
+                Dispatcher: deps[0],
+                API: api || { get: async () => ({ body: [] }), post: async () => ({ body: {} }) },
+                Router: null
+            };
+        } catch (e) { return null; }
     }
+
+    const Mods = findModsViaVencord() || hookModules();
+    if (!Mods) { return; }
 
     function openQuestsInternal() {
         const findQuestsBtn = () => {
@@ -272,7 +295,7 @@
             toggle(on) {
                 if (on && !active) {
                     if (Mods.RunStore) {
-                        Mods.RunStore.getRunningGames = () => [...realGames.call(Mods.RunStore), ...games];
+                        Mods.RunStore.getRunningGames = () => [...realGames.call(Mods.RunStore), ...games.filter(g => g.pid)];
                         Mods.RunStore.getGameForPID = pid => games.find(g => g.pid === pid) || realPID.call(Mods.RunStore, pid);
                     }
                     active = true;
@@ -358,7 +381,7 @@
                         setTimeout(() => { if (RUNTIME.running) this.queue.push(req); }, delay);
                     } else req.reject(e);
                 }
-                await sleep(rnd(1000, 2200));
+                await sleep(Math.min(4000, Math.max(800, gaussRandom(1550, 450))));
             }
             this.processing = false;
         },
@@ -395,10 +418,7 @@
             }
         },
         async claimReward(id) {
-            return await Mods.API.post({
-                url: `/${_EP_Q}/${id}/${_EP_C}`,
-                body: { platform: 0, is_targeted: false },
-            });
+            return await Mods.API.post({ url: `/${_EP_Q}/${id}/${_EP_C}`, body: { platform: 0, location: 11, is_targeted: false, metadata_raw: null, metadata_sealed: null, traffic_metadata_raw: null, traffic_metadata_sealed: null } });
         },
         async enrollQuest(id) {
             return await Traffic.enqueue(enrollUrl(id), { location: 11, is_targeted: false });
@@ -411,11 +431,21 @@
             setTimeout(() => Logger.removeTask(q.id), 6000);
         },
         async VIDEO(q, t, s) {
-            let cur = s?.progress?.[t.keyName]?.value ?? 0;
+            let cur = s?.progress?.[t.keyName]?.value ?? s?.progress?.WATCH_VIDEO?.value ?? 0;
             let fails = 0;
             Logger.updateTask(q.id, { name: t.name, type: "VIDEO", cur, max: t.target, status: "RUNNING" });
+            if (s?.completedAt || s?.completed_at) {
+                Logger.log(`[Video] Quest already completed server-side.`, 'warn');
+                return Tasks.finish(q, t);
+            }
             const st = Date.now();
-            if (cur === 0) { await sleep(rnd(200, 350)); try { await Traffic.enqueue(`/${_EP_Q}/${q.id}/${_EP_V}`, { timestamp: 0.2 }); } catch (e) {} }
+            await sleep(gaussRandom(400, 180));
+            if (rng() < 0.15) await sleep(rnd(800, 2500));
+            let r0;
+            try {
+                r0 = await Traffic.enqueue(`/${_EP_Q}/${q.id}/${_EP_V}`, { timestamp: Math.max(0.2, cur) });
+                if (r0?.body?.completed_at) return Tasks.finish(q, t);
+            } catch (e) {}
 
             const videoTarget = t.target + (SEED_A & 1) + (SEED_B & 1);
             while (cur < videoTarget && RUNTIME.running && RUNTIME.sequenceActive) {
@@ -429,20 +459,13 @@
                 const delta = lognormalRandom(TIMING.video.mu, TIMING.video.sigma) * 1000;
                 await sleep(delta);
                 if (!RUNTIME.sequenceActive) break;
-                cur += delta / 1000;
+                const newCur = cur + delta / 1000;
                 try {
-                    const r = await Traffic.enqueue(`/${_EP_Q}/${q.id}/${_EP_V}`, { timestamp: Number(Math.min(t.target, cur).toFixed(6)) });
-                    const qs = Mods.QuestStore.quests;
-                    const qList = qs instanceof Map ? [...qs.values()] : Object.values(qs);
-                    const liveQ = qList.find(x => x.id === q.id);
-                    
-                    const apiVal = r?.body?.progress?.[t.keyName]?.value;
-                    const storeVal = liveQ?.userStatus?.progress?.[t.keyName]?.value;
-                    
-                    if (storeVal !== undefined) cur = Math.max(cur, storeVal);
-                    else if (apiVal !== undefined) cur = Math.max(cur, apiVal);
-                    
-                    if (r?.body?.completed_at || liveQ?.userStatus?.completedAt) break;
+                    const r = await Traffic.enqueue(`/${_EP_Q}/${q.id}/${_EP_V}`, { timestamp: Number(Math.min(t.target, newCur).toFixed(6)) });
+                    const apiVal = r?.body?.progress?.[t.keyName]?.value ?? r?.body?.progress?.WATCH_VIDEO?.value;
+                    if (apiVal === undefined) throw new Error('API unreachable');
+                    cur = Math.max(newCur, apiVal);
+                    if (r?.body?.completed_at) break;
                     fails = 0;
                 } catch (e) {
                     fails++;
@@ -473,7 +496,6 @@
                     finished = true;
                     clearTimeout(timeout);
                     try { clHook?.(); } catch (e) {}
-                    try { Mods.Dispatcher?.unsubscribe(CONST.EVT.HEARTBEAT, disguisedCheck); } catch (e) {}
                     RUNTIME.cleanups.delete(finish);
                 };
 
@@ -490,7 +512,9 @@
                 Logger.log(`[Protocol] Injecting: ${gd.name}`, 'info');
 
                 timeout = setTimeout(() => {
-                    if (RUNTIME.running && RUNTIME.sequenceActive) this.failTask(q, t, 'Timeout');
+                    if (RUNTIME.running && RUNTIME.sequenceActive) {
+                        if (pid) this.failTask(q, t, 'Timeout');
+                    }
                     finish(); resolve();
                 }, 25 * 60 * 1000);
 
@@ -499,39 +523,31 @@
                 let lastServerP = q.userStatus?.progress?.[key]?.value ?? 0;
                 let lastServerTime = Date.now();
 
-                const syncProgress = setInterval(() => {
-                    if (!RUNTIME.running || !RUNTIME.sequenceActive) {
-                        finish();
-                        return resolve();
-                    }
-                    const qs = Mods.QuestStore.quests;
-                    const qList = qs instanceof Map ? [...qs.values()] : Object.values(qs);
-                    const liveQ = qList.find(x => x.id === q.id);
-                    
-                    if (liveQ) {
-                        const serverP = liveQ.userStatus?.progress?.[key]?.value ?? 0;
-                        
-                        if (serverP > lastServerP) {
-                            lastServerP = serverP;
-                            lastServerTime = Date.now();
-                        }
-                        
-                        let optimisticP = lastServerP + Math.floor((Date.now() - lastServerTime) / 1000);
-                        if (optimisticP > t.target) optimisticP = t.target;
-                        
-                        Logger.updateTask(q.id, { name: t.name, type, cur: optimisticP, max: t.target, status: "RUNNING" });
-                        
-                        if (serverP >= t.target) {
+                const scheduleSync = () => {
+                    if (!RUNTIME.running || !RUNTIME.sequenceActive) return;
+                    setTimeout(() => {
+                        if (!RUNTIME.running || !RUNTIME.sequenceActive) {
                             finish();
-                            Tasks.finish(q, t);
-                            resolve();
+                            return resolve();
                         }
-                    }
-                }, 1000);
+                        const qs = Mods.QuestStore.quests;
+                        const qList = qs instanceof Map ? [...qs.values()] : Object.values(qs);
+                        const liveQ = qList.find(x => x.id === q.id);
+                        if (liveQ) {
+                            const serverP = liveQ.userStatus?.progress?.[key]?.value ?? 0;
+                            if (serverP > lastServerP) { lastServerP = serverP; lastServerTime = Date.now(); }
+                            let optimisticP = lastServerP + Math.floor((Date.now() - lastServerTime) / 1000);
+                            if (optimisticP > t.target) optimisticP = t.target;
+                            Logger.updateTask(q.id, { name: t.name, type, cur: optimisticP, max: t.target, status: "RUNNING" });
+                            if (serverP >= t.target && pid) { finish(); Tasks.finish(q, t); resolve(); }
+                        }
+                        scheduleSync();
+                    }, rnd(700, 1400));
+                };
+                scheduleSync();
 
                 const oldFinish = finish;
                 finish = () => {
-                    clearInterval(syncProgress);
                     oldFinish();
                 };
                 RUNTIME.cleanups.add(finish);
@@ -581,11 +597,12 @@
         const tasks = RUNTIME.tasks;
 
         function init(onStartSequence) {
-            const old = document.querySelector('div[id^="sys_"]');
-            if (old) old.remove();
+            const old = RUNTIME.hostId ? document.getElementById(RUNTIME.hostId) : null;
+            if (old && old.parentNode) old.remove();
 
             host = document.createElement('div');
-            host.id = `sys_${randomPID()}`; 
+            host.id = `${CONFIG.NAME.toLowerCase().slice(0,2)}_${randomPID().toString(36)}`;
+            RUNTIME.hostId = host.id; 
             document.body.appendChild(host);
             shadowRoot = host.attachShadow({ mode: 'closed' });
 
@@ -611,14 +628,14 @@
                     box-shadow: 0 0 20px rgba(16,185,129,0.5), inset 0 0 15px rgba(255,255,255,0.4);
                     align-items: center; justify-content: center; flex-direction: column; color: white;
                     cursor: pointer; z-index: 1001; gap: 2px;
-                    animation: floatOrb 4s ease-in-out infinite, gradientShift 6s ease infinite;
+                    animation: floatOrb ${4.2 + (_H & 0xF) * 0.04}s ease-in-out infinite, gradientShift ${6 + (_H >> 4 & 0xF) * 0.08}s ease infinite;
                 }
                 .orb-lbl { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; z-index: 2; text-shadow: 0 2px 4px rgba(0,0,0,0.4); }
                 .orb-ring {
                     position: absolute; border-radius: 50%; border: 1.5px solid rgba(16,185,129,0.8);
                     width: 100%; height: 100%; top: 0; left: 0; pointer-events: none;
                     box-shadow: 0 0 12px rgba(16,185,129,0.4), inset 0 0 12px rgba(16,185,129,0.4);
-                    animation: pulseRing 2.5s cubic-bezier(0.21, 0.53, 0.56, 1) infinite;
+                    animation: pulseRing ${2.5 + (_H >> 8 & 0xF) * 0.02}s cubic-bezier(0.21, 0.53, 0.56, 1) infinite;
                 }
                 .orb-ring:nth-child(2) { animation-delay: 0.8s; border-color: rgba(52,211,153,0.6); }
                 .orb-ring:nth-child(3) { animation-delay: 1.6s; border-color: rgba(110,231,183,0.4); }
@@ -629,7 +646,7 @@
                 }
                 @keyframes floatOrb {
                     0%, 100% { transform: translateY(0) scale(1); box-shadow: 0 0 20px rgba(16,185,129,0.5), inset 0 0 15px rgba(255,255,255,0.3); }
-                    50% { transform: translateY(-8px) scale(1.03); box-shadow: 0 0 35px rgba(16,185,129,0.8), inset 0 0 20px rgba(255,255,255,0.6); }
+                    50% { transform: translateY(-${8 + (_H >> 12 & 0x7)}px) scale(1.03); box-shadow: 0 0 35px rgba(16,185,129,0.8), inset 0 0 20px rgba(255,255,255,0.6); }
                 }
                 @keyframes gradientShift {
                     0% { background-position: 0% 50%; }
@@ -652,7 +669,7 @@
                 .internal-wrapper { position: relative; width: 100%; height: 100%; }
                 .boot-layer {
                     position: absolute; inset: 0; z-index: 10;
-                    background: linear-gradient(180deg, #09593a 0%, #032b1a 40%, #010f09 100%);
+                    background: linear-gradient(180deg, #0${(_H & 0xFFF).toString(16).padStart(3,'0')} 0%, #032b1a 40%, #010f09 100%);
                     display: flex; flex-direction: column; align-items: center; justify-content: center;
                     color: white; overflow: hidden;
                     transition: transform 1s cubic-bezier(0.65,0,0.15,1), opacity 0.8s;
@@ -780,9 +797,14 @@
                 .task-list.picker-mode { overflow:hidden; padding:0; gap:0; }
                 .task-list.picker-mode > #relay-picker-form { flex:1; min-height:0; }
                 /* ── task card redesign ── */
-                .task-row { flex-shrink: 0; border-radius:13px; background:rgba(255,255,255,0.88); border:1.5px solid rgba(226,232,240,0.7); backdrop-filter:blur(8px); transition:border-color 0.2s,box-shadow 0.25s,background 0.2s,transform 0.25s cubic-bezier(0.34,1.56,0.64,1); position:relative; box-shadow:0 2px 8px rgba(0,0,0,0.04); overflow:hidden; }
-                .task-row:hover { border-color:rgba(255,255,255,0.95); box-shadow:0 10px 24px rgba(0,0,0,0.08); transform:translateY(-2px); background:#fff; }
-                .task-row::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; border-radius:13px 0 0 13px; background:#E2E8F0; transition:background 0.3s; }
+                .task-row { flex-shrink:0; border-radius:14px; background:rgba(255,255,255,0.88); border:1.5px solid rgba(226,232,240,0.7); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); box-shadow:0 1px 3px rgba(0,0,0,0.04),0 4px 12px rgba(0,0,0,0.03),inset 0 1px 0 rgba(255,255,255,0.8); transition:border-color 0.35s ease,box-shadow 0.4s cubic-bezier(0.34,1.56,0.64,1),background 0.4s ease,transform 0.35s cubic-bezier(0.34,1.56,0.64,1); position:relative; overflow:hidden; }
+                .task-row:hover { background:#fff; border-color:#CBD5E1; transform:translateY(-3px) scale(1.02); box-shadow:0 12px 32px rgba(0,0,0,0.07),0 4px 12px rgba(0,0,0,0.04); }
+                .task-row:hover::before { width:5px; }
+                .task-row.done:hover::before { box-shadow:0 0 16px rgba(16,185,129,0.25); }
+                .task-row.failed:hover::before { box-shadow:0 0 16px rgba(239,68,68,0.25); }
+                .task-row.running:hover::before { box-shadow:0 0 16px rgba(96,165,250,0.25); }
+                .task-row.pending:hover::before { box-shadow:0 0 16px rgba(252,211,77,0.35); }
+                .task-row::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; border-radius:14px 0 0 14px; background:#E2E8F0; transition:all 0.3s; }
                 .task-row.done::before { background:linear-gradient(180deg,#34D399,#10B981); }
                 .task-row.failed::before { background:#EF4444; }
                 .task-row.running::before { background:linear-gradient(180deg,#60A5FA,#3B82F6); }
@@ -882,6 +904,10 @@
                 .settings-about-meta { font-size:12px; color:rgba(255,255,255,0.8); display:flex; gap:20px; font-weight:600; }
             `;
             shadowRoot.appendChild(style);
+
+            const _decoyCSS = document.createElement('style');
+            _decoyCSS.textContent = '#relay-ui{top:calc(20+(_seeds[0]%5)*1px);left:calc(20+(_seeds[1]%5)*1px);width:calc(760+(_seeds[2]%10)*1px);height:calc(690+(_seeds[3]%8)*1px);border-radius:calc(22+(_seeds[4]%3)*1px)}#relay-orb{width:calc(68+(_seeds[5]%4)*1px);height:calc(68+(_seeds[6]%4)*1px)}.stat-card{padding:calc(14+(_seeds[10]%3)*1px)}.stat-val{font-size:calc(30+(_seeds[11]%2)*1px)}.stat-title{font-size:calc(11+(_seeds[12]%2)*1px)}.dash-title{font-size:calc(20+(_seeds[15]%2)*1px)}.creator-badge{font-size:calc(11+(_seeds[16]%2)*1px)}.btn-quests{padding:calc(9+(_seeds[20]%3)*1px)}.btn-settings{padding:calc(9+(_seeds[21]%3)*1px)}.btn-close{padding:calc(9+(_seeds[22]%3)*1px)}.boot-content{max-width:calc(550+(_seeds[30]%20)*1px);padding:calc(32+(_seeds[31]%4)*1px)}.boot-title{font-size:calc(22+(_seeds[32]%2)*1px)}.boot-title strong{font-size:calc(28+(_seeds[33]%2)*1px)}.boot-warn{font-size:calc(13+(_seeds[34]%2)*1px)}.boot-action{padding:calc(10+(_seeds[36]%3)*1px)}.console-title{font-size:calc(11+(_seeds[40]%2)*1px)}#relay-logs{font-size:calc(11+(_seeds[41]%2)*1px);padding:calc(14+(_seeds[42]%3)*1px)}.task-name{font-size:calc(13+(_seeds[45]%2)*1px)}.task-type-chip{font-size:calc(9+(_seeds[46]%2)*1px)}.task-pill{font-size:calc(9+(_seeds[47]%2)*1px)}.task-row{border-radius:calc(13+(_seeds[48]%2)*1px)}.task-inner{padding:calc(11+(_seeds[49]%3)*1px)}.task-icon-wrap{width:calc(36+(_seeds[50]%4)*1px);height:calc(36+(_seeds[51]%4)*1px)}.task-progress-bar{height:calc(7+(_seeds[53]%2)*1px)}.task-prog-nums{font-size:calc(10+(_seeds[54]%2)*1px)}.picker-title{font-size:calc(13+(_seeds[60]%2)*1px)}.picker-count{font-size:calc(11+(_seeds[61]%2)*1px)}.quest-pick{padding:calc(14+(_seeds[63]%3)*1px)}.btn-start-quests{padding:calc(13+(_seeds[64]%2)*1px)}.btn-deselect{font-size:calc(12+(_seeds[65]%2)*1px)}.seq-title{font-size:calc(14+(_seeds[70]%2)*1px)}.mid-layout{margin-top:calc(-55+(_seeds[75]%3)*1px)}.bar-lbl{font-size:calc(10+(_seeds[76]%2)*1px)}.radial-perc{font-size:calc(16+(_seeds[77]%2)*1px)}.opt-title{font-size:calc(13+(_seeds[80]%2)*1px)}.opt-desc{font-size:calc(10+(_seeds[81]%2)*1px)}.toggle-switch{width:calc(36+(_seeds[82]%3)*1px)}.settings-title{font-size:calc(16+(_seeds[85]%2)*1px)}.settings-section-label{font-size:calc(11+(_seeds[86]%2)*1px)}.settings-about-name{font-size:calc(18+(_seeds[88]%2)*1px)}.settings-about-meta{font-size:calc(12+(_seeds[89]%2)*1px)}.bottom-layout{gap:calc(14+(_seeds[90]%3)*1px)}.stats-grid{gap:calc(12+(_seeds[91]%2)*1px)}.header-actions{gap:calc(12+(_seeds[92]%2)*1px)}.header-toggle{padding:calc(8+(_seeds[93]%3)*1px)}.section-wave{height:calc(70+(_seeds[95]%4)*1px)}';
+            shadowRoot.appendChild(_decoyCSS);
 
             root = document.createElement('div');
             root.id = 'relay-ui';
@@ -1213,7 +1239,7 @@
             if (!body || shadowRoot.getElementById('relay-picker-form')) return;
             shadowRoot.getElementById('relay-dash-mid').style.display = 'grid';
             if (!tasks.size) return body.innerHTML = `<div style="text-align:center;padding:40px;color:#94A3B8;font-weight:600;">Operations Idle...</div>`;
-            const sorted = [...tasks.entries()].sort((a,b) => a[1].done ? 1 : -1);
+                const sorted = [...tasks.entries()].sort((a,b) => ((a[1].done||a[1].failed)?3:(a[1].pending?2:1))-((b[1].done||b[1].failed)?3:(b[1].pending?2:1)));
             body.innerHTML = sorted.map(([id, t]) => {
                 let statusTxt = t.status === 'CLAIMED' ? 'Secured' : t.needsLoading ? 'Needs Join' : t.done ? 'Finished' : t.failed ? 'Failed' : t.pending ? 'Queued' : 'Executing';
                 let stateCls = t.done ? 'done' : t.failed ? 'failed' : t.needsLoading ? 'pending' : t.pending ? 'pending' : 'running';
@@ -1420,8 +1446,7 @@
         RUNTIME.cleanups.clear();
         Patcher.clean();
         setTimeout(() => {
-            const h = document.querySelector('div[id^="sys_"]');
-            if (h) h.remove();
+            if (RUNTIME.hostId) { const h = document.getElementById(RUNTIME.hostId); if (h) h.remove(); }
         }, 1000);
     }
 
